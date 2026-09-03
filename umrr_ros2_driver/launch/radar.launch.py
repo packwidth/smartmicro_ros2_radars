@@ -13,21 +13,16 @@
 # limitations under the License.
 
 import os
-import launch_ros
 
 from ament_index_python import get_package_share_directory
-from launch_ros.actions import Node
-
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument
-from launch.substitutions import LaunchConfiguration
+from launch_ros.actions import Node
 
 PACKAGE_NAME = 'umrr_ros2_driver'
 
 
 def generate_launch_description():
     """Generate the launch description."""
-       
     radar__params = os.path.join(
            get_package_share_directory(PACKAGE_NAME), 'param/radar.params.snowblind.yaml')
     radar_node = Node(
@@ -39,5 +34,3 @@ def generate_launch_description():
     return LaunchDescription([
         radar_node
     ])
-
-    
