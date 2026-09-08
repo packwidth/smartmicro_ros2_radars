@@ -106,7 +106,7 @@ void SmartDownloadService::download_firmware()
   auto future = download_client_->async_send_request(request);
 
   // Async callback, do non block rviz
-  std::thread([this, future]() mutable {
+  std::thread([this, future = std::move(future)]() mutable {
     try {
       auto result = future.get();
       QString response_msg = QString::fromStdString(result->res);
