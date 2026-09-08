@@ -48,7 +48,64 @@ endif()
 
 ament_auto_find_build_dependencies()
 
-set(SMARTMICRO_LIB_DIR "lib-linux-armv8-gcc_9")
+# The smartmicro SDK ships prebuilt libraries in directories named
+# lib-<os>-<arch>-<compiler>_<major>. Derive it from the current toolchain
+# unless the user pinned one explicitly via -DSMARTMICRO_LIB_DIR=...
+if(NOT SMARTMICRO_LIB_DIR)
+    string(TOLOWER "${CMAKE_SYSTEM_NAME}" _sm_os)
+
+    if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|AMD64|amd64)$")
+        set(_sm_arch "x86_64")
+    elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64)$")
+        set(_sm_arch "armv8")
+    elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "^armv7")
+        set(_sm_arch "armv7hf")
+    elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "^(i[3-6]86|x86)$")
+        set(_sm_arch "x86")
+    else()
+        message(FATAL_ERROR "No smartmicro libraries for architecture '${CMAKE_SYSTEM_PROCESSOR}'")
+    endif()
+
+    if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+        set(_sm_compiler "gcc")
+    elseif(MSVC)
+        set(_sm_compiler "msvc")
+    else()
+        # Clang and friends are ABI-compatible with the gcc builds on Linux.
+        set(_sm_compiler "gcc")
+    endif()
+
+    if(MSVC)
+        # Directories use the Visual Studio version (16 == VS2019 == toolset 142).
+        math(EXPR _sm_compiler_major "${MSVC_TOOLSET_VERSION} - 126")
+    else()
+        string(REGEX MATCH "^[0-9]+" _sm_compiler_major "${CMAKE_CXX_COMPILER_VERSION}")
+    endif()
+
+    # Pick the newest shipped toolchain that is not newer than ours.
+    file(GLOB _sm_candidates
+        RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}/smartmicro"
+        "${CMAKE_CURRENT_SOURCE_DIR}/smartmicro/lib-${_sm_os}-${_sm_arch}-${_sm_compiler}_*")
+
+    set(_sm_best_version 0)
+    foreach(_sm_candidate IN LISTS _sm_candidates)
+        string(REGEX MATCH "[0-9]+$" _sm_candidate_version "${_sm_candidate}")
+        if(_sm_candidate_version
+           AND NOT _sm_candidate_version GREATER _sm_compiler_major
+           AND _sm_candidate_version GREATER _sm_best_version)
+            set(_sm_best_version "${_sm_candidate_version}")
+            set(SMARTMICRO_LIB_DIR "${_sm_candidate}")
+        endif()
+    endforeach()
+
+    if(NOT SMARTMICRO_LIB_DIR)
+        message(FATAL_ERROR
+            "No smartmicro libraries found for lib-${_sm_os}-${_sm_arch}-${_sm_compiler}_<=${_sm_compiler_major}. "
+            "Available: ${_sm_candidates}")
+    endif()
+endif()
+
+message(STATUS "Using smartmicro libraries from ${SMARTMICRO_LIB_DIR}")
 
 # specify the path to search for the libraries
 link_directories(${CMAKE_CURRENT_SOURCE_DIR}/smartmicro/${SMARTMICRO_LIB_DIR})
